@@ -1,9 +1,11 @@
 import json
+import sys
 
 import pyautogui
 import time
 import paho.mqtt.client as mqtt
 import ssl
+from pynput import mouse
 
 port = 8883
 broker = "065dfdc87c034835a0618c9577b5beb8.s1.eu.hivemq.cloud"
@@ -11,7 +13,8 @@ broker_tls="065dfdc87c034835a0618c9577b5beb8.s1.eu.hivemq.cloud:8883"
 broker_tlswebsocket="065dfdc87c034835a0618c9577b5beb8.s1.eu.hivemq.cloud:8884/mqtt"
 username = "mouse_server"
 password = "Mouseclient@1"
-topic = "mouse/movements"
+topic_movement = "mouse/movements"
+topic_scroll = "mouse/scroll"
 
 def on_connect(client, userdata, flags, rc):
     print("Connected with result code "+str(rc))
@@ -38,7 +41,6 @@ if result != 0:
     print("Could not connect to MQTT Server")
     sys.exit(-1)
 
-
 #working code that publishes the message for testing purpose
 # resultPublish = mqtt_client.publish(topic,"blablabla3",qos=0)
 
@@ -48,7 +50,6 @@ if result != 0:
 #Format looks like {'tdelta_ype': 'move', 'delta_x': 642, 'delta_y': 970}
 
 # Changes as per https://docs.google.com/document/d/1cdkMqVwNma-kTNs2hdkxf66jkxs6oZiKX4sQLJf_Xdc/edit#heading=h.3mx4fdelta_ywm1vwn
-
 # Get the screen resolution
 screen_width, screen_height = pyautogui.size()
 
@@ -59,6 +60,19 @@ center_y = screen_height / 2
 prev_delta_x = 0
 prev_delta_y = 0
 
+def on_scroll(sx, sy, dx, dy):
+    if dy > 0:
+        msg=json.dumps({"Scroll up":  "43^" })        
+        mqtt_client.publish(topic_scroll, str(msg))
+    if dy < 0:
+        msg=json.dumps({"Scroll down":  "42^" })        
+        mqtt_client.publish(topic_scroll, str(msg))
+
+while True:  
+    with mouse.Listener(on_scroll=on_scroll) as listener:
+        listener.join() 
+    time.sleep(0.01)  # Adjust sleep time based on desired frequencdelta_y
+
 while True:
     x, y = pyautogui.position()
 
@@ -67,14 +81,13 @@ while True:
     delta_y = y - center_y
     
     # Create MQTT message based on mouse position        
-    # if prev_delta_x == 0 and prev_delta_y == 0:
-        
+    # if prev_delta_x == 0 and prev_delta_y == 0:        
     if (prev_delta_x!=delta_x or prev_delta_y!=delta_y): 
         prev_delta_x = delta_x
         prev_delta_y = delta_y 
-        msg=json.dumps({"type": "move","x":  delta_x,"y": delta_y})        
-        mqtt_client.publish(topic, str(msg))
+        msg=json.dumps({"delta":  str(delta_x) + "," + str(delta_y) + ",^" })        
+        mqtt_client.publish(topic_movement, str(msg))
         pyautogui.moveTo(center_x, center_y)
-
+            
     time.sleep(0.01)  # Adjust sleep time based on desired frequencdelta_y
 
